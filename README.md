@@ -3,8 +3,8 @@
 Watch company career sites for new job postings matching your keywords, and get
 notified the moment a match appears.
 
-JobRadar polls Applicant Tracking Systems (ATS) directly — Workday, iCIMS,
-Greenhouse, Lever, Ashby, SmartRecruiters — so alerts are fresh and accurate
+JobRadar polls Applicant Tracking Systems (ATS) directly - Workday, iCIMS,
+Greenhouse, Lever, Ashby, SmartRecruiters - so alerts are fresh and accurate
 rather than lagging behind a third-party aggregator. You point it at a careers
 URL; it fingerprints the ATS automatically, normalizes every posting, dedupes
 against what it has already seen, and pushes new matches to the channels you
@@ -20,16 +20,16 @@ configure.
   covers every Workday tenant (thousands of companies). Cover ~6 platforms and
   you have most of the tech/corporate market.
 - **Auto-detection.** `jobradar add-company <careers-url>` fingerprints the ATS
-  from the URL (and, if needed, by following redirects / scanning the page) —
+  from the URL (and, if needed, by following redirects / scanning the page) -
   you never pick an adapter by hand.
 
 ## Architecture at a glance
 
 Two abstractions, everything else is a swappable plugin:
 
-- **`JobSource`** — `fetch()` returns normalized `Job` objects. One adapter per
+- **`JobSource`** - `fetch()` returns normalized `Job` objects. One adapter per
   ATS platform.
-- **`Notifier`** — `send(jobs)` delivers matches to a channel.
+- **`Notifier`** - `send(jobs)` delivers matches to a channel.
 
 Plugins are registered via Python entry points (`jobradar.sources`,
 `jobradar.notifiers`), so third parties can ship sources/notifiers in their own
@@ -44,7 +44,7 @@ batch `INSERT OR IGNORE` into SQLite → notify concurrently on new jobs only.
 | Sources (ATS)                                                  | Notifiers                                  |
 | ------------------------------------------------------------- | ------------------------------------------ |
 | Workday, iCIMS, Greenhouse, Lever, Ashby, SmartRecruiters     | Console, Discord, Telegram, Slack webhook  |
-| Adzuna (aggregator — designed-for, not yet implemented)       | OAuth notifiers (Slack/Gmail/Discord, later) |
+| Adzuna (aggregator - designed-for, not yet implemented)       | OAuth notifiers (Slack/Gmail/Discord, later) |
 
 ## Tech stack
 
