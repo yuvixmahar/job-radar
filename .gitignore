@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+*.egg
+
+# Virtual envs / uv
+.venv/
+venv/
+.python-version
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# JobRadar runtime artifacts
+*.db
+*.sqlite
+*.sqlite3
+config.yaml
+.secrets/
+.jobradar/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
