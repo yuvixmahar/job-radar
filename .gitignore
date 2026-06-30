@@ -28,6 +28,9 @@ config.yaml
 .secrets/
 .jobradar/
 
+# Local working guidance — kept out of the published repo
+CLAUDE.md
+
 # Editors / OS
 .vscode/
 .idea/
