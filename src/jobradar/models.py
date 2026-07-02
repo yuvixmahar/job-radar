@@ -1,7 +1,11 @@
+import re
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+_WHITESPACE = re.compile(r"\s+")
 
 
 class Job(BaseModel):
@@ -30,3 +34,35 @@ class Job(BaseModel):
 
     def __hash__(self) -> int:
         return hash(self.id)
+
+
+class MatchRule(BaseModel):
+    """Keywords a posting's title is matched against.
+
+    Keywords are normalized at construction: stripped, internal whitespace
+    collapsed, empties dropped, and de-duplicated case-insensitively
+    (first occurrence wins). Original casing is preserved for display; the
+    matcher compares case-insensitively. An empty list means *match everything*
+    (no filter).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    keywords: tuple[str, ...] = ()
+
+    @field_validator("keywords", mode="before")
+    @classmethod
+    def _normalize(cls, value: object) -> tuple[str, ...]:
+        if not isinstance(value, Sequence) or isinstance(value, str | bytes):
+            raise ValueError("keywords must be a sequence of strings")
+        seen: set[str] = set()
+        normalized: list[str] = []
+        for item in value:
+            if not isinstance(item, str):
+                raise ValueError("keywords must be strings")
+            keyword = _WHITESPACE.sub(" ", item).strip()
+            key = keyword.lower()
+            if keyword and key not in seen:
+                seen.add(key)
+                normalized.append(keyword)
+        return tuple(normalized)

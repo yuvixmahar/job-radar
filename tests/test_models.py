@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from jobradar.models import Job
+from jobradar.models import Job, MatchRule
 
 
 def make_job(
@@ -89,3 +89,54 @@ def test_dedups_in_a_set_by_id() -> None:
 
 def test_raw_excluded_from_repr() -> None:
     assert "raw" not in repr(make_job(raw={"secret": "value"}))
+
+
+def test_matchrule_defaults_to_empty() -> None:
+    assert MatchRule().keywords == ()
+
+
+def test_matchrule_preserves_case_and_strips() -> None:
+    rule = MatchRule(keywords=("  Firmware  ", "C++", ".NET"))
+    assert rule.keywords == ("Firmware", "C++", ".NET")
+
+
+def test_matchrule_collapses_internal_whitespace() -> None:
+    rule = MatchRule(keywords=("Machine\t Learning", "Data   Engineer"))
+    assert rule.keywords == ("Machine Learning", "Data Engineer")
+
+
+def test_matchrule_drops_empties() -> None:
+    rule = MatchRule(keywords=("", "   ", "Go"))
+    assert rule.keywords == ("Go",)
+
+
+def test_matchrule_dedups_case_insensitively_first_wins() -> None:
+    rule = MatchRule(keywords=("Go", "rust", "GO", " go "))
+    assert rule.keywords == ("Go", "rust")
+
+
+def test_matchrule_accepts_a_list_at_runtime() -> None:
+    # YAML/config produces lists; Pydantic coerces them to the stored tuple.
+    rule = MatchRule.model_validate({"keywords": ["Go", "Rust"]})
+    assert rule.keywords == ("Go", "Rust")
+
+
+def test_matchrule_is_frozen() -> None:
+    rule = MatchRule(keywords=("go",))
+    with pytest.raises(ValidationError):
+        rule.keywords = ("rust",)
+
+
+def test_matchrule_forbids_unknown_fields() -> None:
+    with pytest.raises(ValidationError):
+        MatchRule(keywords=("go",), scope="title")  # type: ignore[call-arg]
+
+
+def test_matchrule_rejects_non_sequence() -> None:
+    with pytest.raises(ValidationError):
+        MatchRule.model_validate({"keywords": "go"})
+
+
+def test_matchrule_rejects_non_string_items() -> None:
+    with pytest.raises(ValidationError):
+        MatchRule.model_validate({"keywords": [1]})
