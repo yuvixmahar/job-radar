@@ -40,7 +40,7 @@ jobradar = "jobradar.cli:app"
 # package by declaring entry points in these groups — no core code changes.
 # Entries are added here as each adapter lands (build-order step 1+).
 [project.entry-points."jobradar.sources"]
-# workday = "jobradar.sources.workday:WorkdaySource"
+workday = "jobradar.sources.workday:WorkdaySource"
 
 [project.entry-points."jobradar.notifiers"]
 # console = "jobradar.notifiers.console:ConsoleNotifier"
