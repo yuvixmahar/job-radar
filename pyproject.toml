@@ -42,6 +42,7 @@ jobradar = "jobradar.cli:app"
 [project.entry-points."jobradar.sources"]
 workday = "jobradar.sources.workday:WorkdaySource"
 greenhouse = "jobradar.sources.greenhouse:GreenhouseSource"
+lever = "jobradar.sources.lever:LeverSource"
 
 [project.entry-points."jobradar.notifiers"]
 # console = "jobradar.notifiers.console:ConsoleNotifier"
