@@ -41,6 +41,7 @@ jobradar = "jobradar.cli:app"
 # Entries are added here as each adapter lands (build-order step 1+).
 [project.entry-points."jobradar.sources"]
 workday = "jobradar.sources.workday:WorkdaySource"
+greenhouse = "jobradar.sources.greenhouse:GreenhouseSource"
 
 [project.entry-points."jobradar.notifiers"]
 # console = "jobradar.notifiers.console:ConsoleNotifier"

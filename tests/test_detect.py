@@ -2,6 +2,7 @@ import httpx
 import pytest
 
 from jobradar.core.detect import build_source, detect_ats
+from jobradar.sources.greenhouse import GreenhouseSource
 from jobradar.sources.workday import WorkdaySource
 
 
@@ -47,6 +48,12 @@ async def test_build_source_returns_workday_adapter() -> None:
     assert isinstance(source, WorkdaySource)
 
 
+async def test_build_source_returns_greenhouse_adapter() -> None:
+    async with httpx.AsyncClient() as client:
+        source = build_source("https://boards.greenhouse.io/acme", client)
+    assert isinstance(source, GreenhouseSource)
+
+
 async def test_build_source_rejects_unknown_ats() -> None:
     async with httpx.AsyncClient() as client:
         with pytest.raises(ValueError):
@@ -54,6 +61,7 @@ async def test_build_source_rejects_unknown_ats() -> None:
 
 
 async def test_build_source_detected_but_no_adapter_yet() -> None:
+    # Lever is fingerprinted but has no adapter yet.
     async with httpx.AsyncClient() as client:
         with pytest.raises(NotImplementedError):
-            build_source("https://boards.greenhouse.io/acme", client)
+            build_source("https://jobs.lever.co/acme", client)

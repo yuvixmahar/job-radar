@@ -20,6 +20,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from jobradar.sources.base import JobSource
+from jobradar.sources.greenhouse import GreenhouseSource
 from jobradar.sources.workday import WorkdaySource
 
 # Host suffix → ATS key. Matched against the URL's hostname (exact or subdomain).
@@ -36,6 +37,7 @@ _HOST_MARKERS: dict[str, str] = {
 # appear here; keys detectable above but absent here have "no adapter yet".
 _BUILDERS: dict[str, Callable[[str, httpx.AsyncClient], JobSource]] = {
     "workday": WorkdaySource.from_url,
+    "greenhouse": GreenhouseSource.from_url,
 }
 
 
