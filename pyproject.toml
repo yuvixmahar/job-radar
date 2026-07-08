@@ -45,7 +45,7 @@ greenhouse = "jobradar.sources.greenhouse:GreenhouseSource"
 lever = "jobradar.sources.lever:LeverSource"
 
 [project.entry-points."jobradar.notifiers"]
-# console = "jobradar.notifiers.console:ConsoleNotifier"
+console = "jobradar.notifiers.console:ConsoleNotifier"
 
 [dependency-groups]
 dev = [
