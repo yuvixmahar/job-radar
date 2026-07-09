@@ -14,7 +14,7 @@ Recognizing an ATS and *having an adapter for it* are separate: we can fingerpri
 all six known platforms, but only build sources for the ones implemented so far.
 """
 
-from collections.abc import Callable
+from typing import Protocol
 from urllib.parse import urlsplit
 
 import httpx
@@ -23,6 +23,15 @@ from jobradar.sources.base import JobSource
 from jobradar.sources.greenhouse import GreenhouseSource
 from jobradar.sources.lever import LeverSource
 from jobradar.sources.workday import WorkdaySource
+
+
+class _SourceBuilder(Protocol):
+    """An adapter's ``from_url`` classmethod: URL (+ optional company) → source."""
+
+    def __call__(
+        self, url: str, client: httpx.AsyncClient, *, company: str | None = None
+    ) -> JobSource: ...
+
 
 # Host suffix → ATS key. Matched against the URL's hostname (exact or subdomain).
 _HOST_MARKERS: dict[str, str] = {
@@ -36,7 +45,7 @@ _HOST_MARKERS: dict[str, str] = {
 
 # ATS key → how to build its adapter from a URL. Only implemented adapters
 # appear here; keys detectable above but absent here have "no adapter yet".
-_BUILDERS: dict[str, Callable[[str, httpx.AsyncClient], JobSource]] = {
+_BUILDERS: dict[str, _SourceBuilder] = {
     "workday": WorkdaySource.from_url,
     "greenhouse": GreenhouseSource.from_url,
     "lever": LeverSource.from_url,
@@ -55,16 +64,22 @@ def detect_ats(url: str) -> str | None:
     return None
 
 
-def build_source(url: str, client: httpx.AsyncClient) -> JobSource:
-    """Build the adapter for a careers URL.
+def check_supported(url: str) -> str:
+    """Return the ATS key if we can build a source for the URL, else raise.
 
-    Raises ``ValueError`` if the ATS can't be recognized, or ``NotImplementedError``
-    if it's recognized but no adapter exists for it yet.
+    Client-free validation for ``add-company``. Raises ``ValueError`` if the ATS
+    can't be recognized, or ``NotImplementedError`` if it's recognized but has no
+    adapter yet.
     """
     key = detect_ats(url)
     if key is None:
         raise ValueError(f"could not detect a known ATS from URL: {url!r}")
-    builder = _BUILDERS.get(key)
-    if builder is None:
+    if key not in _BUILDERS:
         raise NotImplementedError(f"detected ATS {key!r}, but no adapter is available yet")
-    return builder(url, client)
+    return key
+
+
+def build_source(url: str, client: httpx.AsyncClient, *, company: str | None = None) -> JobSource:
+    """Build the adapter for a careers URL (see :func:`check_supported` for errors)."""
+    key = check_supported(url)
+    return _BUILDERS[key](url, client, company=company)

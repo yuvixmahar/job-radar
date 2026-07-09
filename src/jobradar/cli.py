@@ -1,0 +1,124 @@
+"""Command-line front door: ``add-company``, ``list``, ``run``.
+
+The CLI is a thin layer over the config + detection + runner pieces. It reads and
+writes the same human-editable ``config.yaml`` (the hybrid model): ``add-company``
+detects the ATS and appends to it, ``list`` shows it, ``run`` builds the live
+sources/notifiers/store and does one poll.
+"""
+
+import asyncio
+from pathlib import Path
+from typing import Annotated
+
+import httpx
+import typer
+
+from jobradar.config import CompanyConfig, Config
+from jobradar.core.dedup import SeenStore
+from jobradar.core.detect import build_source, check_supported
+from jobradar.core.runner import Runner
+from jobradar.models import MatchRule
+from jobradar.notifiers.base import Notifier
+from jobradar.notifiers.console import ConsoleNotifier
+
+app = typer.Typer(
+    help="Watch career sites for new job postings matching your keywords.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+
+_USER_AGENT = "JobRadar/0.1 (+https://github.com/yuvixmahar/job-radar)"
+
+ConfigOpt = Annotated[Path, typer.Option("--config", "-c", help="Path to config.yaml")]
+_DEFAULT_CONFIG = Path("config.yaml")
+
+
+def _db_path(config_path: Path) -> Path:
+    """Store the dedup DB next to the config file."""
+    return config_path.with_name("jobradar.db")
+
+
+def _build_notifiers(config: Config) -> list[Notifier]:
+    notifiers: list[Notifier] = []
+    for entry in config.notifiers:
+        if entry.type == "console":
+            notifiers.append(ConsoleNotifier())
+        else:
+            typer.echo(f"Error: unknown notifier type {entry.type!r}", err=True)
+            raise typer.Exit(1)
+    return notifiers
+
+
+@app.command("add-company")
+def add_company(
+    url: Annotated[str, typer.Argument(help="Careers page URL")],
+    company: Annotated[str | None, typer.Option(help="Display name (optional)")] = None,
+    config_path: ConfigOpt = _DEFAULT_CONFIG,
+) -> None:
+    """Detect the ATS for a careers URL and add it to the config."""
+    try:
+        key = check_supported(url)
+    except (ValueError, NotImplementedError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    config = Config.load(config_path)
+    if any(existing.url == url for existing in config.companies):
+        typer.echo(f"Already watching {url}")
+        return
+
+    updated = config.model_copy(
+        update={"companies": (*config.companies, CompanyConfig(url=url, company=company))}
+    )
+    updated.save(config_path)
+    typer.echo(f"Added {key} company: {url}")
+
+
+@app.command("list")
+def list_config(config_path: ConfigOpt = _DEFAULT_CONFIG) -> None:
+    """Show the current configuration."""
+    config = Config.load(config_path)
+    keywords = ", ".join(config.keywords) if config.keywords else "(none - watching all)"
+    typer.echo(f"Config:    {config_path}")
+    typer.echo(f"Keywords:  {keywords}")
+    typer.echo(f"Interval:  {config.poll_interval_minutes} min")
+    typer.echo(f"Notifiers: {', '.join(n.type for n in config.notifiers)}")
+    typer.echo("Companies:")
+    if not config.companies:
+        typer.echo("  (none — add one with 'jobradar add-company <url>')")
+    for entry in config.companies:
+        name = f"  ({entry.company})" if entry.company else ""
+        typer.echo(f"  - {entry.url}{name}")
+
+
+@app.command("run")
+def run(config_path: ConfigOpt = _DEFAULT_CONFIG) -> None:
+    """Run a single poll: fetch, match, dedup, and notify."""
+    config = Config.load(config_path)
+    if not config.companies:
+        typer.echo("No companies configured. Add one with 'jobradar add-company <url>'.", err=True)
+        raise typer.Exit(1)
+
+    notifiers = _build_notifiers(config)
+    for entry in config.companies:  # validate URLs up front (no network)
+        try:
+            check_supported(entry.url)
+        except (ValueError, NotImplementedError) as exc:
+            typer.echo(f"Error for {entry.url}: {exc}", err=True)
+            raise typer.Exit(1) from exc
+
+    asyncio.run(_poll_once(config, notifiers, _db_path(config_path)))
+
+
+async def _poll_once(config: Config, notifiers: list[Notifier], db_path: Path) -> None:
+    rule = MatchRule(keywords=config.keywords)
+    async with httpx.AsyncClient(
+        headers={"User-Agent": _USER_AGENT},
+        timeout=httpx.Timeout(20.0),
+        follow_redirects=True,
+    ) as client:
+        sources = [build_source(c.url, client, company=c.company) for c in config.companies]
+        with SeenStore(db_path) as store:
+            new_jobs = await Runner(sources, rule, store, notifiers).run_once()
+    if not new_jobs:
+        typer.echo("No new matching jobs.")
