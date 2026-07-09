@@ -1,4 +1,5 @@
 import io
+from pathlib import Path
 
 from jobradar.models import Job
 from jobradar.notifiers.console import ConsoleNotifier
@@ -60,3 +61,13 @@ async def test_send_writes_nothing_for_empty_list() -> None:
     stream = io.StringIO()
     await ConsoleNotifier(stream).send([])
     assert stream.getvalue() == ""
+
+
+async def test_send_survives_non_ascii_data_on_limited_stream(tmp_path: Path) -> None:
+    # Simulates a Windows cp1252 stdout: a non-ASCII title must not crash the run.
+    path = tmp_path / "out.txt"
+    with path.open("w", encoding="ascii") as stream:
+        await ConsoleNotifier(stream).send([make_job(title="Café Software Enginéer")])
+    text = path.read_text(encoding="ascii")
+    assert "Software" in text
+    assert "?" in text  # the accented chars were replaced, not raised

@@ -25,11 +25,14 @@ class ConsoleNotifier(Notifier):
         if not jobs:
             return
         stream = self._stream if self._stream is not None else sys.stdout
-        # ASCII only: the console's default encoding is not UTF-8 everywhere
-        # (e.g. cp1252 on Windows), so fancy bullets/dashes would mojibake.
+        # Our own decoration is ASCII (cp1252 consoles can't do fancy bullets),
+        # but job *data* can be any Unicode. Re-encode to the stream's encoding
+        # with replacement so a non-ASCII title can't crash the whole run.
         lines = [f"{len(jobs)} new job(s):"]
         for job in jobs:
             meta = f"{job.company}, {job.location}" if job.location else job.company
             lines.append(f"  * {job.title}  ({meta})")
             lines.append(f"    {job.url}")
-        print("\n".join(lines), file=stream)
+        text = "\n".join(lines)
+        encoding = getattr(stream, "encoding", None) or "utf-8"
+        print(text.encode(encoding, errors="replace").decode(encoding), file=stream)
