@@ -3,7 +3,7 @@
 The CLI is a thin layer over the config + detection + runner pieces. It reads and
 writes the same human-editable ``config.yaml`` (the hybrid model): ``add-company``
 detects the ATS and appends to it, ``list`` shows it, ``run`` builds the live
-sources/notifiers/store and does one poll.
+sources/notifiers/store and polls once (or continuously with ``--watch``).
 """
 
 import asyncio
@@ -17,6 +17,7 @@ from jobradar.config import CompanyConfig, Config
 from jobradar.core.dedup import SeenStore
 from jobradar.core.detect import build_source, check_supported
 from jobradar.core.runner import Runner
+from jobradar.core.scheduler import run_forever
 from jobradar.models import MatchRule
 from jobradar.notifiers.base import Notifier
 from jobradar.notifiers.console import ConsoleNotifier
@@ -92,8 +93,14 @@ def list_config(config_path: ConfigOpt = _DEFAULT_CONFIG) -> None:
 
 
 @app.command("run")
-def run(config_path: ConfigOpt = _DEFAULT_CONFIG) -> None:
-    """Run a single poll: fetch, match, dedup, and notify."""
+def run(
+    config_path: ConfigOpt = _DEFAULT_CONFIG,
+    watch: Annotated[
+        bool,
+        typer.Option("--watch", "-w", help="Poll continuously on the configured interval."),
+    ] = False,
+) -> None:
+    """Poll once (default) or continuously with --watch: fetch, match, dedup, notify."""
     config = Config.load(config_path)
     if not config.companies:
         typer.echo("No companies configured. Add one with 'jobradar add-company <url>'.", err=True)
@@ -107,10 +114,13 @@ def run(config_path: ConfigOpt = _DEFAULT_CONFIG) -> None:
             typer.echo(f"Error for {entry.url}: {exc}", err=True)
             raise typer.Exit(1) from exc
 
-    asyncio.run(_poll_once(config, notifiers, _db_path(config_path)))
+    try:
+        asyncio.run(_run(config, notifiers, _db_path(config_path), watch=watch))
+    except KeyboardInterrupt:
+        typer.echo("\nStopped.")
 
 
-async def _poll_once(config: Config, notifiers: list[Notifier], db_path: Path) -> None:
+async def _run(config: Config, notifiers: list[Notifier], db_path: Path, *, watch: bool) -> None:
     rule = MatchRule(keywords=config.keywords)
     async with httpx.AsyncClient(
         headers={"User-Agent": _USER_AGENT},
@@ -119,6 +129,14 @@ async def _poll_once(config: Config, notifiers: list[Notifier], db_path: Path) -
     ) as client:
         sources = [build_source(c.url, client, company=c.company) for c in config.companies]
         with SeenStore(db_path) as store:
-            new_jobs = await Runner(sources, rule, store, notifiers).run_once()
-    if not new_jobs:
-        typer.echo("No new matching jobs.")
+            runner = Runner(sources, rule, store, notifiers)
+            if not watch:
+                new_jobs = await runner.run_once()
+                if not new_jobs:
+                    typer.echo("No new matching jobs.")
+                return
+            interval = config.poll_interval_minutes
+            typer.echo(
+                f"Watching {len(sources)} company(ies) every {interval} min. Press Ctrl+C to stop."
+            )
+            await run_forever(runner.run_once, interval * 60)

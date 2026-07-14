@@ -2,11 +2,13 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import pytest
 import respx
 from typer.testing import CliRunner
 
 from jobradar.cli import app
 from jobradar.config import CompanyConfig, Config, NotifierConfig
+from jobradar.core.scheduler import Poll
 
 runner = CliRunner()
 
@@ -131,3 +133,26 @@ def test_run_second_time_reports_no_new_jobs(tmp_path: Path) -> None:
     result = runner.invoke(app, ["run", "--config", str(cfg_path)])  # second: deduped
     assert result.exit_code == 0, result.output
     assert "No new matching jobs." in result.output
+
+
+def test_run_watch_schedules_on_configured_interval(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    Config(
+        poll_interval_minutes=15,
+        companies=(CompanyConfig(url="https://boards.greenhouse.io/airbnb"),),
+    ).save(cfg_path)
+
+    seen: dict[str, float] = {}
+
+    async def fake_run_forever(poll: Poll, interval_seconds: float) -> int:
+        seen["interval"] = interval_seconds  # capture, don't actually loop
+        return 0
+
+    monkeypatch.setattr("jobradar.cli.run_forever", fake_run_forever)
+
+    result = runner.invoke(app, ["run", "--watch", "--config", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert "Watching" in result.output
+    assert seen["interval"] == 15 * 60  # minutes -> seconds
