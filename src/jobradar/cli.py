@@ -8,7 +8,7 @@ sources/notifiers/store and polls once (or continuously with ``--watch``).
 
 import asyncio
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, NoReturn
 
 import httpx
 import typer
@@ -21,6 +21,8 @@ from jobradar.core.scheduler import run_forever
 from jobradar.models import MatchRule
 from jobradar.notifiers.base import Notifier
 from jobradar.notifiers.console import ConsoleNotifier
+from jobradar.notifiers.discord import DiscordNotifier
+from jobradar.notifiers.telegram import TelegramNotifier
 
 app = typer.Typer(
     help="Watch career sites for new job postings matching your keywords.",
@@ -39,14 +41,30 @@ def _db_path(config_path: Path) -> Path:
     return config_path.with_name("jobradar.db")
 
 
-def _build_notifiers(config: Config) -> list[Notifier]:
+def _fail(message: str) -> NoReturn:
+    typer.echo(f"Error: {message}", err=True)
+    raise typer.Exit(1)
+
+
+def _build_notifiers(config: Config, client: httpx.AsyncClient) -> list[Notifier]:
+    """Build notifier instances from config, reading webhook settings from extras."""
     notifiers: list[Notifier] = []
     for entry in config.notifiers:
+        extra = entry.model_extra or {}
         if entry.type == "console":
             notifiers.append(ConsoleNotifier())
+        elif entry.type == "discord":
+            webhook_url = extra.get("webhook_url")
+            if not webhook_url:
+                _fail("discord notifier requires 'webhook_url'")
+            notifiers.append(DiscordNotifier(str(webhook_url), client))
+        elif entry.type == "telegram":
+            token, chat_id = extra.get("bot_token"), extra.get("chat_id")
+            if not token or chat_id is None:
+                _fail("telegram notifier requires 'bot_token' and 'chat_id'")
+            notifiers.append(TelegramNotifier(str(token), str(chat_id), client))
         else:
-            typer.echo(f"Error: unknown notifier type {entry.type!r}", err=True)
-            raise typer.Exit(1)
+            _fail(f"unknown notifier type {entry.type!r}")
     return notifiers
 
 
@@ -106,7 +124,6 @@ def run(
         typer.echo("No companies configured. Add one with 'jobradar add-company <url>'.", err=True)
         raise typer.Exit(1)
 
-    notifiers = _build_notifiers(config)
     for entry in config.companies:  # validate URLs up front (no network)
         try:
             check_supported(entry.url)
@@ -115,18 +132,19 @@ def run(
             raise typer.Exit(1) from exc
 
     try:
-        asyncio.run(_run(config, notifiers, _db_path(config_path), watch=watch))
+        asyncio.run(_run(config, _db_path(config_path), watch=watch))
     except KeyboardInterrupt:
         typer.echo("\nStopped.")
 
 
-async def _run(config: Config, notifiers: list[Notifier], db_path: Path, *, watch: bool) -> None:
+async def _run(config: Config, db_path: Path, *, watch: bool) -> None:
     rule = MatchRule(keywords=config.keywords)
     async with httpx.AsyncClient(
         headers={"User-Agent": _USER_AGENT},
         timeout=httpx.Timeout(20.0),
         follow_redirects=True,
     ) as client:
+        notifiers = _build_notifiers(config, client)
         sources = [build_source(c.url, client, company=c.company) for c in config.companies]
         with SeenStore(db_path) as store:
             runner = Runner(sources, rule, store, notifiers)

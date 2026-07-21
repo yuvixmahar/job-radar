@@ -46,6 +46,8 @@ lever = "jobradar.sources.lever:LeverSource"
 
 [project.entry-points."jobradar.notifiers"]
 console = "jobradar.notifiers.console:ConsoleNotifier"
+discord = "jobradar.notifiers.discord:DiscordNotifier"
+telegram = "jobradar.notifiers.telegram:TelegramNotifier"
 
 [dependency-groups]
 dev = [

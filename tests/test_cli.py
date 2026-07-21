@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Any
 
@@ -133,6 +134,42 @@ def test_run_second_time_reports_no_new_jobs(tmp_path: Path) -> None:
     result = runner.invoke(app, ["run", "--config", str(cfg_path)])  # second: deduped
     assert result.exit_code == 0, result.output
     assert "No new matching jobs." in result.output
+
+
+@respx.mock
+def test_run_delivers_to_discord_webhook(tmp_path: Path) -> None:
+    webhook = "https://discord.com/api/webhooks/1/tok"
+    respx.get(GH_ENDPOINT).mock(
+        return_value=httpx.Response(200, json={"jobs": [gh_posting(title="Backend Engineer")]})
+    )
+    discord_route = respx.post(webhook).mock(return_value=httpx.Response(204))
+
+    cfg_path = tmp_path / "config.yaml"
+    discord = NotifierConfig.model_validate({"type": "discord", "webhook_url": webhook})
+    Config(
+        keywords=("engineer",),
+        companies=(CompanyConfig(url="https://boards.greenhouse.io/airbnb"),),
+        notifiers=(discord,),
+    ).save(cfg_path)
+
+    result = runner.invoke(app, ["run", "--config", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert discord_route.called
+    payload = json.loads(discord_route.calls[0].request.content)
+    assert "Backend Engineer" in payload["content"]
+
+
+def test_run_discord_without_webhook_url_errors(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    discord = NotifierConfig.model_validate({"type": "discord"})  # missing webhook_url
+    Config(
+        companies=(CompanyConfig(url="https://boards.greenhouse.io/airbnb"),),
+        notifiers=(discord,),
+    ).save(cfg_path)
+
+    result = runner.invoke(app, ["run", "--config", str(cfg_path)])
+    assert result.exit_code == 1
+    assert "webhook_url" in result.output
 
 
 def test_run_watch_schedules_on_configured_interval(
