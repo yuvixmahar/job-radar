@@ -19,6 +19,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from jobradar.sources.ashby import AshbySource
 from jobradar.sources.base import JobSource
 from jobradar.sources.greenhouse import GreenhouseSource
 from jobradar.sources.lever import LeverSource
@@ -49,6 +50,7 @@ _BUILDERS: dict[str, _SourceBuilder] = {
     "workday": WorkdaySource.from_url,
     "greenhouse": GreenhouseSource.from_url,
     "lever": LeverSource.from_url,
+    "ashby": AshbySource.from_url,
 }
 
 
