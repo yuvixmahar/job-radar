@@ -21,6 +21,7 @@ import httpx
 
 from jobradar.sources.ashby import AshbySource
 from jobradar.sources.base import JobSource
+from jobradar.sources.breezy import BreezySource
 from jobradar.sources.greenhouse import GreenhouseSource
 from jobradar.sources.lever import LeverSource
 from jobradar.sources.recruitee import RecruiteeSource
@@ -45,6 +46,7 @@ _HOST_MARKERS: dict[str, str] = {
     "icims.com": "icims",
     "smartrecruiters.com": "smartrecruiters",
     "recruitee.com": "recruitee",
+    "breezy.hr": "breezy",
 }
 
 # ATS key → how to build its adapter from a URL. Only implemented adapters
@@ -56,6 +58,7 @@ _BUILDERS: dict[str, _SourceBuilder] = {
     "ashby": AshbySource.from_url,
     "smartrecruiters": SmartRecruitersSource.from_url,
     "recruitee": RecruiteeSource.from_url,
+    "breezy": BreezySource.from_url,
 }
 
 

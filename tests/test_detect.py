@@ -3,6 +3,7 @@ import pytest
 
 from jobradar.core.detect import build_source, detect_ats
 from jobradar.sources.ashby import AshbySource
+from jobradar.sources.breezy import BreezySource
 from jobradar.sources.greenhouse import GreenhouseSource
 from jobradar.sources.lever import LeverSource
 from jobradar.sources.recruitee import RecruiteeSource
@@ -20,6 +21,7 @@ from jobradar.sources.workday import WorkdaySource
         ("https://careers-acme.icims.com/jobs", "icims"),
         ("https://careers.smartrecruiters.com/acme", "smartrecruiters"),
         ("https://acme.recruitee.com", "recruitee"),
+        ("https://acme.breezy.hr", "breezy"),
     ],
 )
 def test_detect_ats_identifies_known_hosts(url: str, key: str) -> None:
@@ -81,6 +83,12 @@ async def test_build_source_returns_recruitee_adapter() -> None:
     async with httpx.AsyncClient() as client:
         source = build_source("https://acme.recruitee.com", client)
     assert isinstance(source, RecruiteeSource)
+
+
+async def test_build_source_returns_breezy_adapter() -> None:
+    async with httpx.AsyncClient() as client:
+        source = build_source("https://acme.breezy.hr", client)
+    assert isinstance(source, BreezySource)
 
 
 async def test_build_source_rejects_unknown_ats() -> None:
