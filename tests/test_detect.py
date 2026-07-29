@@ -8,6 +8,7 @@ from jobradar.sources.greenhouse import GreenhouseSource
 from jobradar.sources.lever import LeverSource
 from jobradar.sources.recruitee import RecruiteeSource
 from jobradar.sources.smartrecruiters import SmartRecruitersSource
+from jobradar.sources.workable import WorkableSource
 from jobradar.sources.workday import WorkdaySource
 
 
@@ -22,6 +23,8 @@ from jobradar.sources.workday import WorkdaySource
         ("https://careers.smartrecruiters.com/acme", "smartrecruiters"),
         ("https://acme.recruitee.com", "recruitee"),
         ("https://acme.breezy.hr", "breezy"),
+        ("https://apply.workable.com/acme", "workable"),
+        ("https://acme.workable.com", "workable"),
     ],
 )
 def test_detect_ats_identifies_known_hosts(url: str, key: str) -> None:
@@ -89,6 +92,12 @@ async def test_build_source_returns_breezy_adapter() -> None:
     async with httpx.AsyncClient() as client:
         source = build_source("https://acme.breezy.hr", client)
     assert isinstance(source, BreezySource)
+
+
+async def test_build_source_returns_workable_adapter() -> None:
+    async with httpx.AsyncClient() as client:
+        source = build_source("https://apply.workable.com/acme", client)
+    assert isinstance(source, WorkableSource)
 
 
 async def test_build_source_rejects_unknown_ats() -> None:

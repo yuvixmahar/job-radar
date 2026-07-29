@@ -47,6 +47,7 @@ ashby = "jobradar.sources.ashby:AshbySource"
 smartrecruiters = "jobradar.sources.smartrecruiters:SmartRecruitersSource"
 recruitee = "jobradar.sources.recruitee:RecruiteeSource"
 breezy = "jobradar.sources.breezy:BreezySource"
+workable = "jobradar.sources.workable:WorkableSource"
 
 [project.entry-points."jobradar.notifiers"]
 console = "jobradar.notifiers.console:ConsoleNotifier"

@@ -26,6 +26,7 @@ from jobradar.sources.greenhouse import GreenhouseSource
 from jobradar.sources.lever import LeverSource
 from jobradar.sources.recruitee import RecruiteeSource
 from jobradar.sources.smartrecruiters import SmartRecruitersSource
+from jobradar.sources.workable import WorkableSource
 from jobradar.sources.workday import WorkdaySource
 
 
@@ -47,6 +48,7 @@ _HOST_MARKERS: dict[str, str] = {
     "smartrecruiters.com": "smartrecruiters",
     "recruitee.com": "recruitee",
     "breezy.hr": "breezy",
+    "workable.com": "workable",
 }
 
 # ATS key → how to build its adapter from a URL. Only implemented adapters
@@ -59,6 +61,7 @@ _BUILDERS: dict[str, _SourceBuilder] = {
     "smartrecruiters": SmartRecruitersSource.from_url,
     "recruitee": RecruiteeSource.from_url,
     "breezy": BreezySource.from_url,
+    "workable": WorkableSource.from_url,
 }
 
 
