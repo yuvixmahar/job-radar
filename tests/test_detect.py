@@ -2,6 +2,7 @@ import httpx
 import pytest
 
 from jobradar.core.detect import build_source, detect_ats
+from jobradar.sources.amazon import AmazonSource
 from jobradar.sources.ashby import AshbySource
 from jobradar.sources.breezy import BreezySource
 from jobradar.sources.greenhouse import GreenhouseSource
@@ -25,6 +26,7 @@ from jobradar.sources.workday import WorkdaySource
         ("https://acme.breezy.hr", "breezy"),
         ("https://apply.workable.com/acme", "workable"),
         ("https://acme.workable.com", "workable"),
+        ("https://www.amazon.jobs/en/search", "amazon"),
     ],
 )
 def test_detect_ats_identifies_known_hosts(url: str, key: str) -> None:
@@ -98,6 +100,12 @@ async def test_build_source_returns_workable_adapter() -> None:
     async with httpx.AsyncClient() as client:
         source = build_source("https://apply.workable.com/acme", client)
     assert isinstance(source, WorkableSource)
+
+
+async def test_build_source_returns_amazon_adapter() -> None:
+    async with httpx.AsyncClient() as client:
+        source = build_source("https://www.amazon.jobs", client)
+    assert isinstance(source, AmazonSource)
 
 
 async def test_build_source_rejects_unknown_ats() -> None:
