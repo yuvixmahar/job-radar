@@ -1,14 +1,15 @@
-from jobradar.core.matcher import matched_keywords, matches
+from jobradar.core.matcher import location_matches, matched_keywords, matches
 from jobradar.models import Job, MatchRule
 
 
-def job(title: str) -> Job:
+def job(title: str, location: str | None = None) -> Job:
     return Job(
         id="workday:acme:R-1",
         source="workday",
         company="Acme",
         title=title,
         url="https://x/y",
+        location=location,
     )
 
 
@@ -93,3 +94,35 @@ def test_empty_rule_matches_every_job() -> None:
 def test_empty_rule_reports_no_matched_keywords() -> None:
     # It matches (no filter), but there are no keywords to name.
     assert matched_keywords(job("Anything"), MatchRule()) == []
+
+
+# --- location matching (same boundary-aware engine, against job.location) ---
+
+
+def test_location_keyword_is_boundary_aware() -> None:
+    rule = MatchRule(keywords=("US",))
+    assert location_matches(job("SWE", "Remote - US"), rule)
+    assert not location_matches(job("SWE", "Houston, TX"), rule)  # 'us' sits inside
+
+
+def test_location_short_code_does_not_match_longer_word() -> None:
+    rule = MatchRule(keywords=("ON",))
+    assert location_matches(job("SWE", "Toronto, ON, Canada"), rule)
+    assert not location_matches(job("SWE", "London, UK"), rule)  # 'on' sits inside
+
+
+def test_location_matches_within_messy_strings() -> None:
+    assert location_matches(job("SWE", "Toronto, ON, Canada"), MatchRule(keywords=("Canada",)))
+    messy = job("SWE", "CN,Shanghai-Design Ctr B1")
+    assert location_matches(messy, MatchRule(keywords=("Shanghai",)))
+
+
+def test_empty_location_rule_keeps_everything_including_none() -> None:
+    empty = MatchRule()
+    assert location_matches(job("SWE", "Anywhere"), empty)
+    assert location_matches(job("SWE", None), empty)
+
+
+def test_nonempty_location_rule_drops_jobs_with_no_location() -> None:
+    rule = MatchRule(keywords=("Canada",))
+    assert not location_matches(job("SWE", None), rule)
