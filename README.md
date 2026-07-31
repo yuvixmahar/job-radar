@@ -36,6 +36,7 @@ Commands:
 | --- | --- |
 | `jobradar add-company <url>` | Detects the platform behind a careers URL and adds it to your config |
 | `jobradar list` | Shows what you are currently watching |
+| `jobradar location add/remove/list <kw>` | Manage the location filter keywords |
 | `jobradar run` | Runs one poll |
 | `jobradar run --watch` | Polls continuously on your configured interval |
 
@@ -52,6 +53,7 @@ option; copy it to `config.yaml` and edit the few values you care about. Your
 
 ```yaml
 keywords: [engineer, "C++", python]
+locations: [Canada, Remote]
 poll_interval_minutes: 30
 
 companies:
@@ -67,6 +69,14 @@ notifiers:
 
 Leave `keywords` empty and it watches every posting instead of filtering. A
 Telegram notifier looks like `type: telegram` with `bot_token` and `chat_id`.
+
+`locations` filters on where a posting is, using the same boundary-aware matching
+as `keywords` but against the posting's location. A job is kept only when its
+title matches `keywords` **and** its location matches `locations` (both apply
+together); a posting with no location is dropped while the filter is set. So
+`US` matches "Remote - US" but not "Houston", and `Canada` matches
+"Toronto, ON, Canada". Leave it empty to watch every location. Edit it by hand or
+with `jobradar location add Canada` / `remove` / `list`.
 
 ## What is interesting about it
 
@@ -94,7 +104,9 @@ and searching for `C` should match "Embedded C Developer" but not "C++ Developer
 and not "Calculus". Plain substring search gets this wrong, and so do normal word
 boundaries, because regex treats `+` and `#` as punctuation. The matcher builds a
 per-keyword pattern that counts `+ # .` as part of a token, so `C`, `C++`, `C#`,
-and `.NET` stay distinct.
+and `.NET` stay distinct. The same engine powers the location filter: because
+spaces, commas, and hyphens are boundaries, `US` matches "Remote - US" but not
+"Houston", with no location database to maintain.
 
 **Deduplication costs two queries per poll, no matter the size.** Job IDs live in
 SQLite with the ID as the primary key. Each poll reads the known IDs into a set,
