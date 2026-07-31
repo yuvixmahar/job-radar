@@ -1,5 +1,7 @@
 # JobRadar
 
+[![CI](https://github.com/yuvixmahar/job-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/yuvixmahar/job-radar/actions/workflows/ci.yml)
+
 Watch company career sites for new job postings that match your keywords, and get
 told about them as soon as they appear.
 
@@ -150,8 +152,8 @@ redirects to an ATS is not resolved yet.
 ## Not yet
 
 On the roadmap: an iCIMS adapter, Slack and OAuth based notifiers, an Adzuna
-aggregator source, redirect-following in detection (so vanity domains resolve),
-and a CI matrix that verifies the Python version support (see below).
+aggregator source, and redirect-following in detection (so vanity domains
+resolve).
 
 ## Tech stack
 
@@ -160,9 +162,9 @@ Typer for the CLI, Pydantic v2 for models and config, httpx for async HTTP, SQLi
 from the standard library, structlog for structured logs. Tested with pytest and
 respx, checked with ruff and mypy in strict mode.
 
-Development currently happens on Python 3.14. A CI matrix across 3.11 to 3.14 is on
-the roadmap, so for now treat 3.11 as the declared floor rather than a version
-proven in continuous integration.
+Continuous integration runs the lint, format, type check, and test steps on
+Python 3.11, 3.12, 3.13, and 3.14, so the 3.11+ support is checked on every push
+rather than just claimed.
 
 ## Development
 
