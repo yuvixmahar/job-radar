@@ -21,6 +21,7 @@ shown you, and sends the new ones to your console, Discord, or Telegram.
 
 ```bash
 uv sync
+cp config.example.yaml config.yaml   # optional starting point you can edit
 uv run jobradar add-company https://boards.greenhouse.io/airbnb
 uv run jobradar run
 ```
@@ -44,7 +45,10 @@ takes `--config / -c` to point at a config file other than `./config.yaml`.
 ## Configuration
 
 Everything lives in a `config.yaml` that you can read and edit by hand. The CLI
-writes to the same file, so you can use whichever is more convenient.
+writes to the same file, so you can use whichever is more convenient. A commented
+[`config.example.yaml`](config.example.yaml) ships with the repo showing every
+option; copy it to `config.yaml` and edit the few values you care about. Your
+`config.yaml` is git-ignored, so notifier tokens never get committed.
 
 ```yaml
 keywords: [engineer, "C++", python]

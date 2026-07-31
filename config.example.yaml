@@ -1,0 +1,48 @@
+# JobRadar example configuration.
+#
+# Copy this file to `config.yaml` and edit the few values you care about:
+#
+#     cp config.example.yaml config.yaml
+#
+# `config.yaml` is git-ignored on purpose (it can hold notifier tokens), so your
+# real settings never get committed. This example is committed so you can see the
+# full shape of the file. The CLI reads and writes the same `config.yaml`:
+# `jobradar add-company <url>` appends to `companies` for you, while keywords and
+# notifier settings are meant to be hand-edited here.
+
+# Keywords matched against job TITLES only, word-boundary aware and
+# case-insensitive. `C` matches "Embedded C Developer" but not "C++" or
+# "Calculus"; `C++`, `C#`, `.NET` stay distinct tokens.
+# Leave the list empty ([]) to watch every posting (no filter).
+keywords:
+  - Python
+  - Backend
+  - Platform Engineer
+
+# How often to re-poll when running `jobradar run --watch`. Must be > 0.
+poll_interval_minutes: 30
+
+# Companies to watch. Each needs a careers URL; the ATS platform is auto-detected
+# from the URL, so you never pick an adapter. `company` is an optional display
+# name. Add these by hand or with `jobradar add-company <careers-url>`.
+companies:
+  - url: https://boards.greenhouse.io/example
+    company: Example Co
+  - url: https://jobs.lever.co/example
+  # - url: https://example.wd1.myworkdayjobs.com/en-US/careers
+
+# Where to send new matches. Each entry has a `type` plus that channel's own
+# settings. You can list several; they all fire on every poll.
+notifiers:
+  # Console prints matches to stdout. No extra settings. Good default.
+  - type: console
+
+  # Discord: paste an Incoming Webhook URL from a channel's integration settings.
+  # - type: discord
+  #   webhook_url: https://discord.com/api/webhooks/XXXX/YYYY
+
+  # Telegram: create a bot with @BotFather for the token, and use your numeric
+  # chat id (message the bot, then check the getUpdates API, or use @userinfobot).
+  # - type: telegram
+  #   bot_token: "123456:ABC-DEF..."
+  #   chat_id: "987654321"
