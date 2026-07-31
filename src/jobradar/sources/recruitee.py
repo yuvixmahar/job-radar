@@ -38,6 +38,10 @@ class RecruiteeSource(JobSource):
         self._endpoint = f"https://{slug}.recruitee.com/api/offers/"
 
     @classmethod
+    def hosts(cls) -> tuple[str, ...]:
+        return ("recruitee.com",)
+
+    @classmethod
     def from_url(
         cls,
         url: str,

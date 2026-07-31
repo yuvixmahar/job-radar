@@ -39,6 +39,10 @@ class GreenhouseSource(JobSource):
         self._endpoint = f"{_API_BASE}/{board_token}/jobs"
 
     @classmethod
+    def hosts(cls) -> tuple[str, ...]:
+        return ("greenhouse.io",)
+
+    @classmethod
     def from_url(
         cls,
         url: str,

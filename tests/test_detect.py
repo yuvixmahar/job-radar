@@ -1,6 +1,7 @@
 import httpx
 import pytest
 
+from jobradar.core import detect
 from jobradar.core.detect import build_source, detect_ats
 from jobradar.sources.amazon import AmazonSource
 from jobradar.sources.ashby import AshbySource
@@ -106,6 +107,39 @@ async def test_build_source_returns_amazon_adapter() -> None:
     async with httpx.AsyncClient() as client:
         source = build_source("https://www.amazon.jobs", client)
     assert isinstance(source, AmazonSource)
+
+
+# --- entry-point registry ---
+
+
+def test_registry_is_loaded_from_entry_points() -> None:
+    host_markers, builders = detect._registry()
+    # Every built-in adapter is present, discovered via its entry point...
+    for key in ("workday", "greenhouse", "lever", "ashby", "amazon"):
+        assert key in builders
+    # ...and each source's own hosts() populated the marker map.
+    assert host_markers["greenhouse.io"] == "greenhouse"
+    assert host_markers["amazon.jobs"] == "amazon"
+
+
+def test_registry_skips_a_broken_plugin(monkeypatch: pytest.MonkeyPatch) -> None:
+    class BrokenEntryPoint:
+        name = "bad"
+
+        def load(self) -> object:
+            raise ImportError("plugin is broken")
+
+    def only_broken(*, group: str) -> list[BrokenEntryPoint]:
+        return [BrokenEntryPoint()]
+
+    detect._registry.cache_clear()
+    monkeypatch.setattr(detect, "entry_points", only_broken)
+    try:
+        host_markers, builders = detect._registry()
+        assert "bad" not in builders  # skipped, no crash
+        assert host_markers.get("icims.com") == "icims"  # static markers survive
+    finally:
+        detect._registry.cache_clear()  # rebuild from real entry points for other tests
 
 
 async def test_build_source_rejects_unknown_ats() -> None:

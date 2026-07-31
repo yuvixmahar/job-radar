@@ -2,33 +2,33 @@
 
 The user only ever pastes a careers URL (``jobradar add-company <url>``); this
 module decides *which* :class:`~jobradar.sources.base.JobSource` handles it, so
-the user never picks an adapter. Detection is pure rules — no AI:
+the user never picks an adapter. Detection is pure rules — no AI — by host
+fingerprint (``myworkdayjobs.com`` → workday, ``greenhouse.io`` → greenhouse, …).
 
-1. **Host fingerprint** (this unit) — ``myworkdayjobs.com`` → workday,
-   ``greenhouse.io`` → greenhouse, … Covers the large majority of URLs with no
-   network call.
-2. *(later)* follow redirects for custom vanity domains, then
-3. *(later)* fetch the page once and scan the HTML for ATS markers.
-
-Recognizing an ATS and *having an adapter for it* are separate: we can fingerprint
-all six known platforms, but only build sources for the ones implemented so far.
+The registry is built from the ``jobradar.sources`` **entry points**: each source
+declares the hosts it handles via :meth:`JobSource.hosts`, so a third party can
+ship an adapter from their own package and have it recognized here without editing
+core. Recognizing a platform and *having an adapter for it* are still separate — a
+small static map names platforms we can fingerprint but haven't implemented yet.
 """
 
+from functools import cache
+from importlib.metadata import entry_points
 from typing import Protocol
 from urllib.parse import urlsplit
 
 import httpx
+import structlog
 
-from jobradar.sources.amazon import AmazonSource
-from jobradar.sources.ashby import AshbySource
 from jobradar.sources.base import JobSource
-from jobradar.sources.breezy import BreezySource
-from jobradar.sources.greenhouse import GreenhouseSource
-from jobradar.sources.lever import LeverSource
-from jobradar.sources.recruitee import RecruiteeSource
-from jobradar.sources.smartrecruiters import SmartRecruitersSource
-from jobradar.sources.workable import WorkableSource
-from jobradar.sources.workday import WorkdaySource
+
+_log = structlog.get_logger("jobradar.detect")
+
+_SOURCES_GROUP = "jobradar.sources"
+
+# Platforms we can fingerprint but have no adapter for yet: detection names them
+# so the CLI can say "known but unimplemented" instead of "unrecognized".
+_UNBUILT_MARKERS: dict[str, str] = {"icims.com": "icims"}
 
 
 class _SourceBuilder(Protocol):
@@ -39,33 +39,26 @@ class _SourceBuilder(Protocol):
     ) -> JobSource: ...
 
 
-# Host suffix → ATS key. Matched against the URL's hostname (exact or subdomain).
-_HOST_MARKERS: dict[str, str] = {
-    "myworkdayjobs.com": "workday",
-    "greenhouse.io": "greenhouse",
-    "lever.co": "lever",
-    "ashbyhq.com": "ashby",
-    "icims.com": "icims",
-    "smartrecruiters.com": "smartrecruiters",
-    "recruitee.com": "recruitee",
-    "breezy.hr": "breezy",
-    "workable.com": "workable",
-    "amazon.jobs": "amazon",
-}
+@cache
+def _registry() -> tuple[dict[str, str], dict[str, _SourceBuilder]]:
+    """Load host markers and URL builders from the ``jobradar.sources`` entry points.
 
-# ATS key → how to build its adapter from a URL. Only implemented adapters
-# appear here; keys detectable above but absent here have "no adapter yet".
-_BUILDERS: dict[str, _SourceBuilder] = {
-    "workday": WorkdaySource.from_url,
-    "greenhouse": GreenhouseSource.from_url,
-    "lever": LeverSource.from_url,
-    "ashby": AshbySource.from_url,
-    "smartrecruiters": SmartRecruitersSource.from_url,
-    "recruitee": RecruiteeSource.from_url,
-    "breezy": BreezySource.from_url,
-    "workable": WorkableSource.from_url,
-    "amazon": AmazonSource.from_url,
-}
+    Returns ``(host suffix → key, key → from_url)``. Cached, so entry points are
+    read once per process. A plugin that fails to import is logged and skipped
+    rather than breaking detection for every other source.
+    """
+    host_markers: dict[str, str] = dict(_UNBUILT_MARKERS)
+    builders: dict[str, _SourceBuilder] = {}
+    for entry_point in entry_points(group=_SOURCES_GROUP):
+        try:
+            source_cls = entry_point.load()
+        except Exception as exc:  # a broken third-party plugin shouldn't sink detection
+            _log.warning("source_plugin_failed", plugin=entry_point.name, error=str(exc))
+            continue
+        builders[entry_point.name] = source_cls.from_url
+        for host in source_cls.hosts():
+            host_markers[host] = entry_point.name
+    return host_markers, builders
 
 
 def detect_ats(url: str) -> str | None:
@@ -74,7 +67,8 @@ def detect_ats(url: str) -> str | None:
     if host is None:
         return None
     host = host.lower()
-    for marker, key in _HOST_MARKERS.items():
+    host_markers, _ = _registry()
+    for marker, key in host_markers.items():
         if host == marker or host.endswith("." + marker):
             return key
     return None
@@ -90,7 +84,8 @@ def check_supported(url: str) -> str:
     key = detect_ats(url)
     if key is None:
         raise ValueError(f"could not detect a known ATS from URL: {url!r}")
-    if key not in _BUILDERS:
+    _, builders = _registry()
+    if key not in builders:
         raise NotImplementedError(f"detected ATS {key!r}, but no adapter is available yet")
     return key
 
@@ -98,4 +93,5 @@ def check_supported(url: str) -> str:
 def build_source(url: str, client: httpx.AsyncClient, *, company: str | None = None) -> JobSource:
     """Build the adapter for a careers URL (see :func:`check_supported` for errors)."""
     key = check_supported(url)
-    return _BUILDERS[key](url, client, company=company)
+    _, builders = _registry()
+    return builders[key](url, client, company=company)

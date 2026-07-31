@@ -39,6 +39,10 @@ class SmartRecruitersSource(JobSource):
         self._endpoint = f"{_API_BASE}/{slug}/postings"
 
     @classmethod
+    def hosts(cls) -> tuple[str, ...]:
+        return ("smartrecruiters.com",)
+
+    @classmethod
     def from_url(
         cls,
         url: str,

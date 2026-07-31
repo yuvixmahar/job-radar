@@ -16,6 +16,17 @@ from jobradar.models import Job
 class JobSource(ABC):
     """A source of job postings from one ATS platform (never per-company)."""
 
+    @classmethod
+    def hosts(cls) -> tuple[str, ...]:
+        """Host suffixes whose careers URLs this source handles, for auto-detection.
+
+        Detection maps each suffix (matched exactly or as a subdomain) to this
+        source, so a plugin is self-describing: shipping an adapter and its
+        entry point is enough to make ``add-company`` recognize its URLs. Empty
+        means the source is not host-detectable.
+        """
+        return ()
+
     @abstractmethod
     async def fetch(self) -> list[Job]:
         """Fetch current postings, normalized to :class:`Job` objects."""

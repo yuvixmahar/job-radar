@@ -37,6 +37,10 @@ class BreezySource(JobSource):
         self._endpoint = f"https://{slug}.breezy.hr/json"
 
     @classmethod
+    def hosts(cls) -> tuple[str, ...]:
+        return ("breezy.hr",)
+
+    @classmethod
     def from_url(
         cls,
         url: str,

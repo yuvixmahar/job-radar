@@ -48,6 +48,10 @@ class WorkdaySource(JobSource):
         self._endpoint = f"https://{self._host}/wday/cxs/{tenant}/{site}/jobs"
 
     @classmethod
+    def hosts(cls) -> tuple[str, ...]:
+        return ("myworkdayjobs.com",)
+
+    @classmethod
     def from_url(
         cls,
         url: str,

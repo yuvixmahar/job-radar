@@ -40,6 +40,10 @@ class AshbySource(JobSource):
         self._endpoint = f"{_API_BASE}/{slug}"
 
     @classmethod
+    def hosts(cls) -> tuple[str, ...]:
+        return ("ashbyhq.com",)
+
+    @classmethod
     def from_url(
         cls,
         url: str,

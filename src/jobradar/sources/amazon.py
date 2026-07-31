@@ -34,6 +34,10 @@ class AmazonSource(JobSource):
         self._company = company or "Amazon"
 
     @classmethod
+    def hosts(cls) -> tuple[str, ...]:
+        return ("amazon.jobs",)
+
+    @classmethod
     def from_url(
         cls,
         url: str,

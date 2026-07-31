@@ -39,6 +39,10 @@ class LeverSource(JobSource):
         self._endpoint = f"{_API_BASE}/{account}?mode=json"
 
     @classmethod
+    def hosts(cls) -> tuple[str, ...]:
+        return ("lever.co",)
+
+    @classmethod
     def from_url(
         cls,
         url: str,
