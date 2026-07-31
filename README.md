@@ -129,7 +129,8 @@ src/jobradar/
 │   ├── recruitee.py       Offers API (company slug is the subdomain)
 │   ├── breezy.py          Public JSON board
 │   ├── workable.py        POST API, token paginated
-│   └── amazon.py          Amazon's own global jobs search
+│   ├── amazon.py          Amazon's own global jobs search
+│   └── amd.py             AMD's own careers site (Phenom platform)
 └── notifiers/       Sending matches out
     ├── base.py      The Notifier contract
     ├── console.py
@@ -143,8 +144,8 @@ concrete source or notifier is a plugin behind one of those two interfaces.
 
 ## Supported today
 
-Sources (9): Workday, Greenhouse, Lever, Ashby, SmartRecruiters, Recruitee,
-Breezy, Workable, and Amazon's own jobs board.
+Sources (10): Workday, Greenhouse, Lever, Ashby, SmartRecruiters, Recruitee,
+Breezy, Workable, Amazon's own jobs board, and AMD's own careers site.
 
 Notifiers (3): console, Discord, Telegram.
 
