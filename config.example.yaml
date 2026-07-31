@@ -19,6 +19,16 @@ keywords:
   - Backend
   - Platform Engineer
 
+# Location keywords matched against a posting's location, the same boundary-aware
+# way as `keywords` (so `US` matches "Remote - US" but not "Houston", and `Canada`
+# matches "Toronto, ON, Canada"). A posting is kept only when its title matches
+# `keywords` AND its location matches `locations` (both filters apply together).
+# A posting with no location is dropped while this filter is set. Leave empty ([])
+# to watch every location. Edit here or with `jobradar location add/remove/list`.
+locations:
+  - Canada
+  - Remote
+
 # How often to re-poll when running `jobradar run --watch`. Must be > 0.
 poll_interval_minutes: 30
 

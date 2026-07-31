@@ -44,6 +44,7 @@ class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     keywords: tuple[str, ...] = ()
+    locations: tuple[str, ...] = ()
     poll_interval_minutes: int = Field(default=30, gt=0)
     companies: tuple[CompanyConfig, ...] = ()
     notifiers: tuple[NotifierConfig, ...] = Field(

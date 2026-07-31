@@ -9,6 +9,7 @@ from jobradar.config import CompanyConfig, Config, NotifierConfig
 def test_defaults() -> None:
     cfg = Config()
     assert cfg.keywords == ()
+    assert cfg.locations == ()
     assert cfg.poll_interval_minutes == 30
     assert cfg.companies == ()
     assert len(cfg.notifiers) == 1
@@ -53,10 +54,17 @@ notifiers:
     assert extra["webhook_url"] == "https://discord.example/webhook"
 
 
+def test_load_parses_locations(tmp_path: Path) -> None:
+    path = tmp_path / "config.yaml"
+    path.write_text("locations: [Canada, Remote]\n", encoding="utf-8")
+    assert Config.load(path).locations == ("Canada", "Remote")
+
+
 def test_save_then_load_roundtrips(tmp_path: Path) -> None:
     path = tmp_path / "config.yaml"
     original = Config(
         keywords=("engineer", "C++"),
+        locations=("Canada", "Remote"),
         poll_interval_minutes=45,
         companies=(CompanyConfig(url="https://x/y", company="X"),),
         notifiers=(NotifierConfig(type="console"),),
