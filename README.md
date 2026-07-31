@@ -78,8 +78,10 @@ the `airbnb` board without you knowing Greenhouse has an API.
 base classes: `JobSource.fetch()` returns normalized `Job` objects, and
 `Notifier.send(jobs)` delivers them. Every source and every notifier is a small
 module behind one of those two, and the matcher, deduplicator, and scheduler never
-learn which platform a posting came from. Adding a source is a new file plus one
-line in the detection registry.
+learn which platform a posting came from. The registries are loaded from Python
+entry points (`jobradar.sources`, `jobradar.notifiers`), and each source declares
+the URL hosts it handles, so a third party can ship a new adapter from their own
+package and have `add-company` recognize its URLs without editing this codebase.
 
 **Keyword matching that understands code.** Matching runs against the job title,
 and searching for `C` should match "Embedded C Developer" but not "C++ Developer"
@@ -147,11 +149,9 @@ redirects to an ATS is not resolved yet.
 
 ## Not yet
 
-Declared as entry points but not yet loaded at runtime, so today a new source or
-notifier still means adding it to the in-code registry rather than shipping it from
-a separate package. Also on the roadmap: an iCIMS adapter, Slack and OAuth based
-notifiers, an Adzuna aggregator source, redirect-following in detection, and a CI
-matrix that verifies the Python version support (see below).
+On the roadmap: an iCIMS adapter, Slack and OAuth based notifiers, an Adzuna
+aggregator source, redirect-following in detection (so vanity domains resolve),
+and a CI matrix that verifies the Python version support (see below).
 
 ## Tech stack
 
