@@ -172,6 +172,19 @@ def test_run_discord_without_webhook_url_errors(tmp_path: Path) -> None:
     assert "webhook_url" in result.output
 
 
+def test_run_unknown_notifier_type_errors(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    bogus = NotifierConfig.model_validate({"type": "carrier-pigeon"})
+    Config(
+        companies=(CompanyConfig(url="https://boards.greenhouse.io/airbnb"),),
+        notifiers=(bogus,),
+    ).save(cfg_path)
+
+    result = runner.invoke(app, ["run", "--config", str(cfg_path)])
+    assert result.exit_code == 1
+    assert "carrier-pigeon" in result.output
+
+
 def test_run_watch_schedules_on_configured_interval(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

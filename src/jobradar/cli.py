@@ -7,8 +7,10 @@ sources/notifiers/store and polls once (or continuously with ``--watch``).
 """
 
 import asyncio
+from functools import cache
+from importlib.metadata import entry_points
 from pathlib import Path
-from typing import Annotated, NoReturn
+from typing import Annotated, Any, NoReturn
 
 import httpx
 import typer
@@ -20,9 +22,8 @@ from jobradar.core.runner import Runner
 from jobradar.core.scheduler import run_forever
 from jobradar.models import MatchRule
 from jobradar.notifiers.base import Notifier
-from jobradar.notifiers.console import ConsoleNotifier
-from jobradar.notifiers.discord import DiscordNotifier
-from jobradar.notifiers.telegram import TelegramNotifier
+
+_NOTIFIERS_GROUP = "jobradar.notifiers"
 
 app = typer.Typer(
     help="Watch career sites for new job postings matching your keywords.",
@@ -46,25 +47,30 @@ def _fail(message: str) -> NoReturn:
     raise typer.Exit(1)
 
 
+@cache
+def _notifier_registry() -> dict[str, Any]:
+    """Load notifier classes from the ``jobradar.notifiers`` entry points (cached)."""
+    registry: dict[str, Any] = {}
+    for entry_point in entry_points(group=_NOTIFIERS_GROUP):
+        try:
+            registry[entry_point.name] = entry_point.load()
+        except Exception as exc:  # a broken third-party plugin shouldn't sink the run
+            typer.echo(f"Warning: notifier plugin {entry_point.name!r} failed: {exc}", err=True)
+    return registry
+
+
 def _build_notifiers(config: Config, client: httpx.AsyncClient) -> list[Notifier]:
-    """Build notifier instances from config, reading webhook settings from extras."""
+    """Build notifiers from config, each via its own ``from_config`` factory."""
+    registry = _notifier_registry()
     notifiers: list[Notifier] = []
     for entry in config.notifiers:
-        extra = entry.model_extra or {}
-        if entry.type == "console":
-            notifiers.append(ConsoleNotifier())
-        elif entry.type == "discord":
-            webhook_url = extra.get("webhook_url")
-            if not webhook_url:
-                _fail("discord notifier requires 'webhook_url'")
-            notifiers.append(DiscordNotifier(str(webhook_url), client))
-        elif entry.type == "telegram":
-            token, chat_id = extra.get("bot_token"), extra.get("chat_id")
-            if not token or chat_id is None:
-                _fail("telegram notifier requires 'bot_token' and 'chat_id'")
-            notifiers.append(TelegramNotifier(str(token), str(chat_id), client))
-        else:
+        notifier_cls = registry.get(entry.type)
+        if notifier_cls is None:
             _fail(f"unknown notifier type {entry.type!r}")
+        try:
+            notifiers.append(notifier_cls.from_config(entry.model_extra or {}, client))
+        except ValueError as exc:
+            _fail(str(exc))
     return notifiers
 
 

@@ -5,6 +5,8 @@ Create a bot with @BotFather, put its token and your chat id in config
 client is injected. Telegram caps message ``text`` at 4096 characters.
 """
 
+from typing import Any, Self
+
 import httpx
 
 from jobradar.models import Job
@@ -21,6 +23,14 @@ class TelegramNotifier(Notifier):
         self._url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         self._chat_id = chat_id
         self._client = client
+
+    @classmethod
+    def from_config(cls, settings: dict[str, Any], client: httpx.AsyncClient) -> Self:
+        """Build from config; requires ``bot_token`` and ``chat_id`` settings."""
+        token, chat_id = settings.get("bot_token"), settings.get("chat_id")
+        if not token or chat_id is None:
+            raise ValueError("telegram notifier requires 'bot_token' and 'chat_id'")
+        return cls(str(token), str(chat_id), client)
 
     async def send(self, jobs: list[Job]) -> None:
         if not jobs:

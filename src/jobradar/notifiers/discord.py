@@ -5,6 +5,8 @@ no OAuth. The HTTP client is injected (shared, politely configured) like the
 sources. Discord caps message ``content`` at 2000 characters.
 """
 
+from typing import Any, Self
+
 import httpx
 
 from jobradar.models import Job
@@ -20,6 +22,14 @@ class DiscordNotifier(Notifier):
     def __init__(self, webhook_url: str, client: httpx.AsyncClient) -> None:
         self._webhook_url = webhook_url
         self._client = client
+
+    @classmethod
+    def from_config(cls, settings: dict[str, Any], client: httpx.AsyncClient) -> Self:
+        """Build from config; requires a ``webhook_url`` setting."""
+        webhook_url = settings.get("webhook_url")
+        if not webhook_url:
+            raise ValueError("discord notifier requires 'webhook_url'")
+        return cls(str(webhook_url), client)
 
     async def send(self, jobs: list[Job]) -> None:
         if not jobs:

@@ -7,7 +7,9 @@ and already new — it just formats and prints them.
 """
 
 import sys
-from typing import TextIO
+from typing import Any, Self, TextIO
+
+import httpx
 
 from jobradar.models import Job
 from jobradar.notifiers.base import Notifier
@@ -20,6 +22,11 @@ class ConsoleNotifier(Notifier):
         # Resolved at send time (below) so a stream swapped in after construction
         # — e.g. test capture — is still honored.
         self._stream = stream
+
+    @classmethod
+    def from_config(cls, settings: dict[str, Any], client: httpx.AsyncClient) -> Self:
+        """Build from config; the console takes no settings or client."""
+        return cls()
 
     async def send(self, jobs: list[Job]) -> None:
         if not jobs:
