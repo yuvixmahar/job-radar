@@ -5,8 +5,10 @@ from jobradar.notifiers.base import Notifier
 from jobradar.sources.base import JobSource
 
 
-def make_job(id: str, title: str) -> Job:
-    return Job(id=id, source="fake", company="Acme", title=title, url=f"https://x/{id}")
+def make_job(id: str, title: str, location: str | None = None) -> Job:
+    return Job(
+        id=id, source="fake", company="Acme", title=title, url=f"https://x/{id}", location=location
+    )
 
 
 class FakeSource(JobSource):
@@ -37,8 +39,15 @@ def runner(
     store: SeenStore,
     *,
     keywords: tuple[str, ...] = ("engineer",),
+    locations: tuple[str, ...] = (),
 ) -> Runner:
-    return Runner(sources, MatchRule(keywords=keywords), store, notifiers)
+    return Runner(
+        sources,
+        MatchRule(keywords=keywords),
+        store,
+        notifiers,
+        location_rule=MatchRule(keywords=locations),
+    )
 
 
 async def test_matches_dedups_and_notifies() -> None:
@@ -68,6 +77,43 @@ async def test_empty_keywords_matches_everything() -> None:
     notifier = RecordingNotifier()
     with SeenStore(":memory:") as store:
         new = await runner([source], [notifier], store, keywords=()).run_once()
+
+    assert {j.id for j in new} == {"1", "2"}
+
+
+async def test_location_filter_ands_with_keywords() -> None:
+    jobs = [
+        make_job("1", "Backend Engineer", "Toronto, ON, Canada"),  # title + location
+        make_job("2", "Backend Engineer", "Austin, TX"),  # title only
+        make_job("3", "Product Manager", "Toronto, ON, Canada"),  # location only
+    ]
+    source = FakeSource(jobs)
+    notifier = RecordingNotifier()
+    with SeenStore(":memory:") as store:
+        new = await runner([source], [notifier], store, locations=("Canada",)).run_once()
+
+    assert [j.id for j in new] == ["1"]  # only the one passing BOTH filters
+
+
+async def test_location_filter_drops_jobs_with_no_location() -> None:
+    jobs = [
+        make_job("1", "Backend Engineer", "Vancouver, BC, Canada"),
+        make_job("2", "Backend Engineer", None),  # no location -> dropped
+    ]
+    source = FakeSource(jobs)
+    notifier = RecordingNotifier()
+    with SeenStore(":memory:") as store:
+        new = await runner([source], [notifier], store, locations=("Canada",)).run_once()
+
+    assert [j.id for j in new] == ["1"]
+
+
+async def test_empty_location_rule_keeps_jobs_with_no_location() -> None:
+    jobs = [make_job("1", "Backend Engineer", None), make_job("2", "Backend Engineer", "Anywhere")]
+    source = FakeSource(jobs)
+    notifier = RecordingNotifier()
+    with SeenStore(":memory:") as store:
+        new = await runner([source], [notifier], store).run_once()  # no location filter
 
     assert {j.id for j in new} == {"1", "2"}
 
