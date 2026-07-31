@@ -104,8 +104,10 @@ def list_config(config_path: ConfigOpt = _DEFAULT_CONFIG) -> None:
     """Show the current configuration."""
     config = Config.load(config_path)
     keywords = ", ".join(config.keywords) if config.keywords else "(none - watching all)"
+    locations = ", ".join(config.locations) if config.locations else "(none - all locations)"
     typer.echo(f"Config:    {config_path}")
     typer.echo(f"Keywords:  {keywords}")
+    typer.echo(f"Locations: {locations}")
     typer.echo(f"Interval:  {config.poll_interval_minutes} min")
     typer.echo(f"Notifiers: {', '.join(n.type for n in config.notifiers)}")
     typer.echo("Companies:")
@@ -114,6 +116,57 @@ def list_config(config_path: ConfigOpt = _DEFAULT_CONFIG) -> None:
     for entry in config.companies:
         name = f"  ({entry.company})" if entry.company else ""
         typer.echo(f"  - {entry.url}{name}")
+
+
+location_app = typer.Typer(
+    help="Manage location filter keywords (matched against a posting's location).",
+    no_args_is_help=True,
+)
+app.add_typer(location_app, name="location")
+
+
+@location_app.command("add")
+def location_add(
+    keyword: Annotated[str, typer.Argument(help="Location keyword, e.g. Canada or Remote")],
+    config_path: ConfigOpt = _DEFAULT_CONFIG,
+) -> None:
+    """Add a location keyword to the filter (idempotent, case-insensitive)."""
+    keyword = keyword.strip()
+    if not keyword:
+        _fail("location keyword cannot be empty")
+    config = Config.load(config_path)
+    if any(existing.lower() == keyword.lower() for existing in config.locations):
+        typer.echo(f"Already filtering location: {keyword}")
+        return
+    updated = config.model_copy(update={"locations": (*config.locations, keyword)})
+    updated.save(config_path)
+    typer.echo(f"Added location: {keyword}")
+
+
+@location_app.command("remove")
+def location_remove(
+    keyword: Annotated[str, typer.Argument(help="Location keyword to remove")],
+    config_path: ConfigOpt = _DEFAULT_CONFIG,
+) -> None:
+    """Remove a location keyword from the filter (case-insensitive)."""
+    config = Config.load(config_path)
+    remaining = tuple(loc for loc in config.locations if loc.lower() != keyword.strip().lower())
+    if len(remaining) == len(config.locations):
+        typer.echo(f"Not in the location filter: {keyword}")
+        return
+    config.model_copy(update={"locations": remaining}).save(config_path)
+    typer.echo(f"Removed location: {keyword}")
+
+
+@location_app.command("list")
+def location_list(config_path: ConfigOpt = _DEFAULT_CONFIG) -> None:
+    """Show the configured location keywords."""
+    config = Config.load(config_path)
+    if not config.locations:
+        typer.echo("No location filter (watching all locations).")
+        return
+    for loc in config.locations:
+        typer.echo(f"  - {loc}")
 
 
 @app.command("run")
@@ -145,6 +198,7 @@ def run(
 
 async def _run(config: Config, db_path: Path, *, watch: bool) -> None:
     rule = MatchRule(keywords=config.keywords)
+    location_rule = MatchRule(keywords=config.locations)
     async with httpx.AsyncClient(
         headers={"User-Agent": _USER_AGENT},
         timeout=httpx.Timeout(20.0),
@@ -153,7 +207,7 @@ async def _run(config: Config, db_path: Path, *, watch: bool) -> None:
         notifiers = _build_notifiers(config, client)
         sources = [build_source(c.url, client, company=c.company) for c in config.companies]
         with SeenStore(db_path) as store:
-            runner = Runner(sources, rule, store, notifiers)
+            runner = Runner(sources, rule, store, notifiers, location_rule=location_rule)
             if not watch:
                 new_jobs = await runner.run_once()
                 if not new_jobs:

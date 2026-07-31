@@ -16,12 +16,14 @@ runner = CliRunner()
 GH_ENDPOINT = "https://boards-api.greenhouse.io/v1/boards/airbnb/jobs"
 
 
-def gh_posting(*, id: int = 1, title: str = "Backend Engineer") -> dict[str, Any]:
+def gh_posting(
+    *, id: int = 1, title: str = "Backend Engineer", location: str = "Remote"
+) -> dict[str, Any]:
     return {
         "id": id,
         "title": title,
         "absolute_url": f"https://boards.greenhouse.io/airbnb/jobs/{id}",
-        "location": {"name": "Remote"},
+        "location": {"name": location},
         "updated_at": "2024-01-01T00:00:00Z",
     }
 
@@ -84,12 +86,50 @@ def test_list_shows_config(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.yaml"
     Config(
         keywords=("engineer",),
+        locations=("Canada",),
         companies=(CompanyConfig(url="https://boards.greenhouse.io/airbnb", company="Airbnb"),),
     ).save(cfg_path)
     result = runner.invoke(app, ["list", "--config", str(cfg_path)])
     assert result.exit_code == 0
     assert "engineer" in result.output.lower()
+    assert "canada" in result.output.lower()
     assert "airbnb" in result.output.lower()
+
+
+# --- location add / remove / list ---
+
+
+def test_location_add_appends_to_config(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    result = runner.invoke(app, ["location", "add", "Canada", "--config", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert Config.load(cfg_path).locations == ("Canada",)
+
+
+def test_location_add_is_idempotent_case_insensitive(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    runner.invoke(app, ["location", "add", "Canada", "--config", str(cfg_path)])
+    result = runner.invoke(app, ["location", "add", "canada", "--config", str(cfg_path)])
+    assert result.exit_code == 0
+    assert "already" in result.output.lower()
+    assert Config.load(cfg_path).locations == ("Canada",)
+
+
+def test_location_remove_drops_keyword(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    Config(locations=("Canada", "Remote")).save(cfg_path)
+    result = runner.invoke(app, ["location", "remove", "canada", "--config", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert Config.load(cfg_path).locations == ("Remote",)
+
+
+def test_location_list_shows_keywords(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    Config(locations=("Canada", "Remote")).save(cfg_path)
+    result = runner.invoke(app, ["location", "list", "--config", str(cfg_path)])
+    assert result.exit_code == 0
+    assert "Canada" in result.output
+    assert "Remote" in result.output
 
 
 # --- run ---
@@ -117,6 +157,26 @@ def test_run_end_to_end_prints_matches(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "Backend Engineer" in result.output
     assert "Designer" not in result.output  # filtered out by keyword
+
+
+@respx.mock
+def test_run_applies_location_filter(tmp_path: Path) -> None:
+    jobs = [
+        gh_posting(id=1, title="Backend Engineer", location="Toronto, ON, Canada"),
+        gh_posting(id=2, title="Backend Engineer", location="Austin, TX"),
+    ]
+    respx.get(GH_ENDPOINT).mock(return_value=httpx.Response(200, json={"jobs": jobs}))
+    cfg_path = tmp_path / "config.yaml"
+    Config(
+        keywords=("engineer",),
+        locations=("Canada",),
+        companies=(CompanyConfig(url="https://boards.greenhouse.io/airbnb"),),
+    ).save(cfg_path)
+
+    result = runner.invoke(app, ["run", "--config", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert "Toronto" in result.output  # Canadian role kept
+    assert "Austin" not in result.output  # Texas role filtered out by location
 
 
 @respx.mock
